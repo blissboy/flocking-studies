@@ -1,7 +1,11 @@
 package org.boyamihungry.processing.flocking;
 
+import org.boyamihungry.processing.DrawingUtilities;
 import processing.core.PApplet;
 import processing.core.PVector;
+import processing.event.KeyEvent;
+
+import javax.validation.constraints.NotNull;
 
 /**
  * Created by patwheaton on 5/26/16.
@@ -15,11 +19,21 @@ public class FlockingExample extends PApplet {
     public static final float COHESE_FORCE = 2f;
     public static final int FOLLOW = 50;
     public static final float FOLLOW_FORCE = 2F;
-    public static final PVector originVector = new PVector(0,0);
+    //public static final PVector originVector = new PVector(0,0);
 
     public static final int WIDTH = 1440;
     public static final int HEIGHT = 1080;
     public static final int NUM_PARTICLES = 40;
+
+    public static final int BACKGROUND = 50;
+
+    public static final int BORDER = 320;
+    public static final float BORDER_FORCE = -1f;
+    public static final float WHAT_IS_ZERO = 0.001f;
+
+    private @NotNull Flock flock;
+
+    boolean stepFrame = false;
 
     //List particles;
 
@@ -44,7 +58,7 @@ public class FlockingExample extends PApplet {
                 PVector diff = PVector.sub(affectingP.getVelocity(), affectedP.getVelocity());
                 return diff.div(dist).mult(AVOID_FORCE);
             } else {
-                return originVector;
+                return DrawingUtilities.getOriginVector();
             }
 
         };
@@ -55,7 +69,7 @@ public class FlockingExample extends PApplet {
             if ( dist < FOLLOW ) {
                 return affectingP.getVelocity().copy().mult(FOLLOW_FORCE);
             } else {
-                return originVector;
+                return DrawingUtilities.getOriginVector();
             }
 
         };
@@ -67,9 +81,53 @@ public class FlockingExample extends PApplet {
             if ( dist < COHESE ) {
                 return affectingP.getPosition().copy().mult(COHESE_FORCE);
             } else {
-                return originVector;
+                return DrawingUtilities.getOriginVector();
             }
 
+        };
+
+        Particle.ParticleBorderVelocityReaction borderVel = (app, p) -> {
+            float otherWayVelX = 0f;
+            float otherWayVelY = 0f;
+
+            if ( p.getPosition().x < BORDER || p.getPosition().x + BORDER > app.width ) {
+                float borderDist = p.getPosition().x < BORDER
+                        ? p.getPosition().x
+                        : width - p.getPosition().x;
+                otherWayVelX = p.getVelocity().x / borderDist;
+            }
+
+            if ( p.getPosition().y < BORDER || p.getPosition().y + BORDER > height ) {
+                float borderDist = (p.getPosition().y < BORDER ? p.getPosition().y : height - p.getPosition().y );
+                otherWayVelY = p.getVelocity().y / borderDist;
+            }
+
+            if ( (int)(1000 * otherWayVelX) != 0 || (int)(1000 * otherWayVelY) != 0 ) {
+                return new PVector(otherWayVelX, otherWayVelY).mult(BORDER_FORCE);
+            } else {
+                return DrawingUtilities.getOriginVector();
+            }
+        };
+
+        Particle.ParticleBorderAccelReaction borderAcc = (app, p) -> {
+            float otherWayAccX = 0f;
+            float otherWayAccY = 0f;
+
+            if ( p.getPosition().x < BORDER || p.getPosition().x + BORDER > width ) {
+                float borderDist = (p.getPosition().x < BORDER ? p.getPosition().x : p.getPosition().x - width);
+                otherWayAccX = (p.getAcceleration().x * borderDist) / (BORDER - Math.abs(borderDist));
+            }
+
+            if ( p.getPosition().y < BORDER || p.getPosition().y + BORDER > height ) {
+                float borderDist = (p.getPosition().y < BORDER ? p.getPosition().y : p.getPosition().y - height);
+                otherWayAccY = (p.getAcceleration().y * borderDist) / (BORDER - Math.abs(borderDist));
+            }
+
+            //if ( (int)(otherWayAccX) != 0 || (int)otherWayAccY != 0 ) {
+            //    return new PVector(otherWayAccX * BORDER_FORCE, otherWayAccY * BORDER_FORCE);
+            //} else {
+                return DrawingUtilities.getOriginVector();
+            //}
         };
 
         SimpleFlock flock = new SimpleFlock();
@@ -79,19 +137,31 @@ public class FlockingExample extends PApplet {
                     new Particle(
                             i,
                             new PVector(random(WIDTH), random(HEIGHT)),
-                            originVector,
+                            DrawingUtilities.getOriginVector(),
                             PVector.random2D().mult(5),
-                            (app,p) -> {
-                                ellipse(p.getPosition().x, p.getPosition().y,5,5);
+                            (app,p) -> {   // drawing function
+
+                                pushMatrix();
+                                pushStyle();
+                                translate(p.getPosition().x, p.getPosition().y);
+                                text(p.getId(),0,0);
+                                ellipse(0,0,5,5);
+                                stroke(0,128,0);
+                                DrawingUtilities.arrowLine(app,0,0,p.getVelocity().x * 10, p.getVelocity().y * 10, 0, .333f, true);
+                                popStyle();
+                                popMatrix();
+
                             },
                             avoid,
                             follow,
-                            cohese
+                            cohese,
+                            borderVel,
+                            borderAcc
                     )
             );
         }
 
-
+        this.flock = flock;
 
         try {
             Thread.sleep(1000);
@@ -103,14 +173,27 @@ public class FlockingExample extends PApplet {
 
     public void draw() {
 
+        if ( stepFrame ) {
+            stepFrame = false;
+            background(BACKGROUND);
+            flock.updateUsingAll(this);
+            flock.draw(this);
 
-
+        }
 
     }
 
+    @Override
+    public void keyTyped(KeyEvent event) {
+        super.keyTyped(event);
 
+        if ( event.getKey() == ' ') {
+            stepFrame = true;
+        }
+    }
 
     static public void main(String[] passedArgs) {
+
 
         String[] appletArgs = new String[]{"org.boyamihungry.processing.flocking.FlockingExample"};
         if (passedArgs != null) {
@@ -121,58 +204,5 @@ public class FlockingExample extends PApplet {
     }
 
 
-    void drawArrow(float x1, float y1, float x0, float y0, float beginHeadSize, float endHeadSize, boolean filled) {
-
-      PVector d = new PVector(x1 - x0, y1 - y0);
-      d.normalize();
-
-      float coeff = 1.5f;
-
-      strokeCap(SQUARE);
-
-      line(x0+d.x*beginHeadSize*coeff/(filled?1.0f:1.75f),
-            y0+d.y*beginHeadSize*coeff/(filled?1.0f:1.75f),
-            x1-d.x*endHeadSize*coeff/(filled?1.0f:1.75f),
-            y1-d.y*endHeadSize*coeff/(filled?1.0f:1.75f));
-
-      float angle = atan2(d.y, d.x);
-
-      if (filled) {
-        // begin head
-        pushMatrix();
-        translate(x0, y0);
-        rotate(angle+PI);
-        triangle(-beginHeadSize*coeff, -beginHeadSize,
-                 -beginHeadSize*coeff, beginHeadSize,
-                 0, 0);
-        popMatrix();
-        // end head
-        pushMatrix();
-        translate(x1, y1);
-        rotate(angle);
-        triangle(-endHeadSize*coeff, -endHeadSize,
-                 -endHeadSize*coeff, endHeadSize,
-                 0, 0);
-        popMatrix();
-      }
-      else {
-        // begin head
-        pushMatrix();
-        translate(x0, y0);
-        rotate(angle+PI);
-        strokeCap(ROUND);
-        line(-beginHeadSize*coeff, -beginHeadSize, 0, 0);
-        line(-beginHeadSize*coeff, beginHeadSize, 0, 0);
-        popMatrix();
-        // end head
-        pushMatrix();
-        translate(x1, y1);
-        rotate(angle);
-        strokeCap(ROUND);
-        line(-endHeadSize*coeff, -endHeadSize, 0, 0);
-        line(-endHeadSize*coeff, endHeadSize, 0, 0);
-        popMatrix();
-      }
-    }
 
 }

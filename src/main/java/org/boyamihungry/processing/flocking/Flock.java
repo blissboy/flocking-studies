@@ -18,6 +18,8 @@ public interface Flock {
             followAll(app);
             avoidAll(app);
             coheseAll(app);
+            stepAll(app);
+            bordersAll(app);
         };
     default public void coheseAll(PApplet app){
             for(Particle p:getMembers()){
@@ -34,6 +36,16 @@ public interface Flock {
                 p.getAvoidWithinFlockCalculator().avoidFlock(app,p,this);
             }
         };
+    default public void stepAll(PApplet app) {
+        for(Particle p:getMembers()){
+            p.step();
+        }
+    }
+    default public void bordersAll(PApplet app) {
+        for(Particle p:getMembers()){
+            p.borders(app);
+        }
+    }
     default public void draw(PApplet app) {
         for (Particle p : getMembers()) {
             p.getDrawer().draw(app,p);

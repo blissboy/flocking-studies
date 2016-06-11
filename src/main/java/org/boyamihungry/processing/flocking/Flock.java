@@ -23,13 +23,20 @@ public interface Flock {
         };
     default public void coheseAll(PApplet app){
             for(Particle p:getMembers()){
-                p.getCoheseToFlockCalculator().coheseFlock(app,p,this);
+                p.getCoheseToFlockCalculator().coheseToFlock(app,p,this);
             }
         };
     default public void followAll(PApplet app){
         for(Particle p:getMembers()){
             p.getFollowFlockCalculator().followFlock(app,p,this);
         }
+
+
+
+    // change followFlockCalc to be followFlock
+
+
+
     };
     default public void avoidAll(PApplet app){
             for(Particle p:getMembers()){

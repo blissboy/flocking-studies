@@ -39,10 +39,12 @@ public class Particle {
                 PVector followSum = DrawingUtilities.getOriginVector();
                 for ( Particle other: flock.getMembers()) {
                     if ( other.getId() != p.getId() ) {
-                        followSum.add(p.getFollowCalculator().follow(app,p,other));
+                        followSum.add(p.getFollowCalculator().follow(app,other,p));
                     }
                 }
-                return followSum;
+                float mag = velocity.mag();
+                velocity = velocity.add(followSum);
+                velocity = velocity.setMag(mag);
             };
 
     @NotNull
@@ -51,10 +53,12 @@ public class Particle {
                 PVector coheseSum = DrawingUtilities.getOriginVector();
                 for ( Particle other: flock.getMembers()) {
                     if ( other.getId() != p.getId() ) {
-                        coheseSum.add(p.getCoheseCalculator().cohese(app,p,other));
+                        coheseSum.add(p.getCoheseCalculator().cohese(app,other,p));
                     }
                 }
-                return coheseSum;
+                float mag = p.getVelocity().mag();
+                velocity = velocity.add( coheseSum );
+                velocity = velocity.setMag(mag);
             };
 
     @NotNull
@@ -63,10 +67,19 @@ public class Particle {
                 PVector avoidSum = DrawingUtilities.getOriginVector();
                 for ( Particle other: flock.getMembers()) {
                     if ( other.getId() != p.getId() ) {
-                        avoidSum.add(p.getAvoidCalculator().avoid(app,p,other));
+                        avoidSum.add(p.getAvoidCalculator().avoid(app,other,p));
                     }
                 }
-                return avoidSum;
+                float mag = velocity.mag();
+                velocity = velocity.add( avoidSum );
+                velocity = velocity.setMag(mag);
+            };
+
+    @NotNull
+    private Wiggler wiggler =
+            () -> {
+              this.velocity.add(PVector.random2D());
+              return this;
             };
 
 
@@ -80,6 +93,7 @@ public class Particle {
             (app, p) -> {return DrawingUtilities.getOriginVector();};
 
 
+    // todo: change to builder
     public Particle(int id,
                     PVector position,
                     PVector acceleration,
@@ -89,7 +103,8 @@ public class Particle {
                     ParticleFollowCalculator follow,
                     ParticleCoheseCalculator cohese,
                     ParticleBorderVelocityReaction borderVelReaction,
-                    ParticleBorderAccelReaction borderAccReaction) {
+                    ParticleBorderAccelReaction borderAccReaction,
+                    Wiggler wiggler) {
 
 
 
@@ -104,12 +119,16 @@ public class Particle {
         this.coheseCalculator = cohese != null ? cohese : coheseCalculator;
         this.followCalculator = follow != null ? follow : followCalculator;
         this.avoidCalculator = avoid != null ? avoid : avoidCalculator;
-        
+        this.wiggler = wiggler != null ? wiggler : this.wiggler;
+
     }
 
     public void step () {
+        this.wiggler.wiggle();
         this.position.add(velocity);
         this.velocity.add(acceleration);
+        this.acceleration.setMag(0f);
+        this.velocity.limit(5);
     }
 
 
@@ -125,9 +144,9 @@ public class Particle {
     }
     @FunctionalInterface
     public interface ParticleFollowFlockCalculator {
-        public PVector followFlock(PApplet app,
-                                   Particle affectedP,
-                                   Flock flock);
+        public void followFlock(PApplet app,
+                                Particle affectedP,
+                                Flock flock);
     }
     @FunctionalInterface
     public interface ParticleAvoidCalculator {
@@ -137,21 +156,21 @@ public class Particle {
     }
     @FunctionalInterface
     public interface ParticleAvoidFlockCalculator {
-        public PVector avoidFlock(PApplet app,
-                                  Particle affectedP,
-                                  Flock flock);
+        public void avoidFlock(PApplet app,
+                               Particle affectedP,
+                               Flock flock);
     }
     @FunctionalInterface
     public interface ParticleCoheseCalculator {
         public PVector cohese(PApplet app,
-                               Particle affectedP,
-                               Particle affectingP);
+                              Particle affectedP,
+                              Particle affectingP);
     }
     @FunctionalInterface
     public interface ParticleCoheseFlockCalculator {
-        public PVector coheseFlock(PApplet app,
-                                   Particle affectedP,
-                                   Flock flock);
+        public void coheseToFlock(PApplet app,
+                                  Particle affectedP,
+                                  Flock flock);
     }
 
     @FunctionalInterface
@@ -165,6 +184,12 @@ public class Particle {
         public PVector borderReact(PApplet app,
                                    Particle affectedP);
     }
+
+    @FunctionalInterface
+    public interface Wiggler {
+        public Particle wiggle();
+    }
+
 
     public ParticleDraw getDrawer() {
         return drawer;
@@ -215,33 +240,57 @@ public class Particle {
 //        acceleration.add(this.borderAccReaction.borderReact(app, this));
 //        acceleration.setMag(mag);
 
-        float mag = velocity.mag();
+//        float mag = velocity.mag();
+//
+//        // debug
+//        PVector borderVelReaction =
+//                this.borderVelReaction.borderReact(app, this);
+//
+//        if ( ! borderVelReaction.equals(DrawingUtilities.getOriginVector())) {
+//            app.pushStyle();
+//            app.pushMatrix();
+//            app.translate(this.getPosition().x, this.getPosition().y);
+//            app.stroke(255, 0, 0);
+//            DrawingUtilities.arrowLine(
+//                    app,
+//                    0,
+//                    0,
+//                    borderVelReaction.x * 5,
+//                    borderVelReaction.y * 5,
+//                    0,
+//                    0.333f,
+//                    true);
+//            //app.ellipse();
+//            app.popMatrix();
+//            app.popStyle();
+//            // end debug
+//        }
+//        velocity.add(this.borderVelReaction.borderReact(app, this));
+//        //velocity.setMag(mag);
 
-        // debug
-        PVector borderVelReaction =
-                this.borderVelReaction.borderReact(app, this);
-
-        if ( ! borderVelReaction.equals(DrawingUtilities.getOriginVector())) {
-            app.pushStyle();
-            app.pushMatrix();
-            app.translate(this.getPosition().x, this.getPosition().y);
-            app.stroke(255, 0, 0);
-            DrawingUtilities.arrowLine(
-                    app,
-                    0,
-                    0,
-                    borderVelReaction.x * 5,
-                    borderVelReaction.y * 5,
-                    0,
-                    0.333f,
-                    true);
-            //app.ellipse();
-            app.popMatrix();
-            app.popStyle();
-            // end debug
+        /* this way wraps around */
+        if ( getPosition().x < 0 ) {
+            this.position.x += app.width;
+        } else if (getPosition().x > app.width ) {
+            this.position.x -= app.width;
         }
-        velocity.add(this.borderVelReaction.borderReact(app, this));
-        //velocity.setMag(mag);
+        if ( getPosition().y < 0 ) {
+            this.position.y += app.height;
+        } else if (getPosition().y > app.height ) {
+            this.position.y -= app.height;
+        }
+
+        /* this way just bounces them ******************************
+
+        if ( getPosition().x < 0 || getPosition().x > app.width ) {
+            velocity.set(getVelocity().x * -1, getVelocity().y);
+        }
+
+        if ( getPosition().y < 0 || getPosition().y > app.height) {
+            velocity.set(getVelocity().x, getVelocity().y * -1);
+        }
+
+        **************************************/
     }
 
 }

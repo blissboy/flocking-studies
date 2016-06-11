@@ -1,5 +1,7 @@
 package org.boyamihungry.processing.flocking;
 
+import controlP5.ControlP5;
+import controlP5.ControlP5Constants;
 import org.boyamihungry.processing.DrawingUtilities;
 import processing.core.PApplet;
 import processing.core.PVector;
@@ -13,25 +15,28 @@ import javax.validation.constraints.NotNull;
 public class FlockingExample extends PApplet {
 
 
-    public static final int AVOID = 15;
-    public static final float AVOID_FORCE = 2f;
-    public static final int COHESE = 15;
-    public static final float COHESE_FORCE = 2f;
-    public static final int FOLLOW = 50;
-    public static final float FOLLOW_FORCE = 2F;
-    //public static final PVector originVector = new PVector(0,0);
+    private int AVOID = 15;
+    private float AVOID_FORCE = 20f;
+    private int COHESE = 50;
+    private float COHESE_FORCE = 2f;
+    private int FOLLOW = 50;
+    private float FOLLOW_FORCE = .2f;
 
-    public static final int WIDTH = 1440;
-    public static final int HEIGHT = 1080;
-    public static final int NUM_PARTICLES = 40;
+    private int WIDTH = 1440;
+    private int HEIGHT = 1080;
+    private int NUM_PARTICLES = 400;
+
+    private int particle_size = 5;
 
     public static final int BACKGROUND = 50;
 
-    public static final int BORDER = 320;
-    public static final float BORDER_FORCE = -1f;
-    public static final float WHAT_IS_ZERO = 0.001f;
+    private int BORDER = 320;
+    private float BORDER_FORCE = -1f;
 
     private @NotNull Flock flock;
+
+    private ControlP5 cp5;
+
 
     boolean stepFrame = false;
 
@@ -47,9 +52,66 @@ public class FlockingExample extends PApplet {
 
         this.frameRate(90f);
 
-        //PApplet app = (PApplet)this;
+//        private int AVOID = 15;
+//        private float AVOID_FORCE = 20f;
+//        private int COHESE = 50;
+//        private float COHESE_FORCE = 2f;
+//        private int FOLLOW = 50;
+//        private float FOLLOW_FORCE = .2f;
+//
+//        private int WIDTH = 1440;
+//        private int HEIGHT = 1080;
+//        private int NUM_PARTICLES = 400;
 
-        //particles = new ArrayList<Particle>();
+        cp5 = new ControlP5(this);
+        final int SLIDER_WIDTH = 200;
+        final int SLIDER_HEIGHT = 20;
+        final int SLIDER_LEFT = 40;
+        final int vSpacing = 15;
+        int count = 0;
+        cp5.addSlider("AVOID")
+                .setPosition(SLIDER_LEFT, (vSpacing + SLIDER_HEIGHT) * ++count)
+                .setSize(SLIDER_WIDTH, SLIDER_HEIGHT)
+                .setRange(1, 100)
+                .setValue(AVOID)
+                .setColorCaptionLabel(ControlP5Constants.RED).getValueLabel().getFont().setSize(30);
+        cp5.addSlider("COHESE")
+                .setPosition(SLIDER_LEFT, (vSpacing + SLIDER_HEIGHT) * ++count)
+                .setSize(SLIDER_WIDTH, SLIDER_HEIGHT)
+                .setRange(1, 100)
+                .setValue(COHESE)
+                .setColorCaptionLabel(ControlP5Constants.RED).getValueLabel().getFont().setSize(30);
+        cp5.addSlider("FOLLOW")
+                .setPosition(SLIDER_LEFT, (vSpacing + SLIDER_HEIGHT) * ++count)
+                .setSize(SLIDER_WIDTH, SLIDER_HEIGHT)
+                .setRange(1, 100)
+                .setValue(FOLLOW)
+                .setColorCaptionLabel(ControlP5Constants.RED).getValueLabel().getFont().setSize(30);
+        cp5.addSlider("AVOID_FORCE")
+                .setPosition(SLIDER_LEFT, (vSpacing + SLIDER_HEIGHT) * ++count)
+                .setSize(SLIDER_WIDTH, SLIDER_HEIGHT)
+                .setRange(1, 100)
+                .setValue(AVOID_FORCE)
+                .setColorCaptionLabel(ControlP5Constants.RED).getValueLabel().getFont().setSize(30);
+        cp5.addSlider("COHESE_FORCE")
+                .setPosition(SLIDER_LEFT, (vSpacing + SLIDER_HEIGHT) * ++count)
+                .setSize(SLIDER_WIDTH, SLIDER_HEIGHT)
+                .setRange(1, 100)
+                .setValue(COHESE_FORCE)
+                .setColorCaptionLabel(ControlP5Constants.RED).getValueLabel().getFont().setSize(30);
+        cp5.addSlider("FOLLOW_FORCE")
+                .setPosition(SLIDER_LEFT, (vSpacing + SLIDER_HEIGHT) * ++count)
+                .setSize(SLIDER_WIDTH, SLIDER_HEIGHT)
+                .setRange(1, 100)
+                .setValue(FOLLOW_FORCE)
+                .setColorCaptionLabel(ControlP5Constants.RED).getValueLabel().getFont().setSize(30);
+
+        cp5.addSlider("particle_size")
+                .setPosition(SLIDER_LEFT, (vSpacing + SLIDER_HEIGHT) * ++count)
+                .setSize(SLIDER_WIDTH, SLIDER_HEIGHT)
+                .setRange(1, 50)
+                .setValue(particle_size)
+                .setColorCaptionLabel(ControlP5.BLUE).getValueLabel().getFont().setSize(30);
 
         Particle.ParticleAvoidCalculator avoid = (app, affectingP, affectedP) -> {
             // get distance between
@@ -71,7 +133,6 @@ public class FlockingExample extends PApplet {
             } else {
                 return DrawingUtilities.getOriginVector();
             }
-
         };
 
 
@@ -79,7 +140,8 @@ public class FlockingExample extends PApplet {
             // get distance between
             float dist = affectingP.getPosition().dist(affectedP.getPosition());
             if ( dist < COHESE ) {
-                return affectingP.getPosition().copy().mult(COHESE_FORCE);
+                // we want to cohese to where they are going
+                return affectingP.getVelocity().copy().mult(COHESE_FORCE);
             } else {
                 return DrawingUtilities.getOriginVector();
             }
@@ -87,26 +149,34 @@ public class FlockingExample extends PApplet {
         };
 
         Particle.ParticleBorderVelocityReaction borderVel = (app, p) -> {
-            float otherWayVelX = 0f;
-            float otherWayVelY = 0f;
+            //float otherWayVelX = 0f;
+            //float otherWayVelY = 0f;
 
-            if ( p.getPosition().x < BORDER || p.getPosition().x + BORDER > app.width ) {
-                float borderDist = p.getPosition().x < BORDER
-                        ? p.getPosition().x
-                        : width - p.getPosition().x;
-                otherWayVelX = p.getVelocity().x / borderDist;
-            }
+            // left border
+            float otherWayVelX = ( p.getVelocity().x + BORDER_FORCE ) / (p.getPosition().x * p.getPosition().x);
+            otherWayVelX += ( p.getVelocity().x - BORDER_FORCE ) / (Math.pow(((float)width) - p.getPosition().x,2));
 
-            if ( p.getPosition().y < BORDER || p.getPosition().y + BORDER > height ) {
-                float borderDist = (p.getPosition().y < BORDER ? p.getPosition().y : height - p.getPosition().y );
-                otherWayVelY = p.getVelocity().y / borderDist;
-            }
+            float otherWayVelY = ( p.getVelocity().y + BORDER_FORCE ) / (p.getPosition().y * p.getPosition().y);
+            otherWayVelY += ( p.getVelocity().y - BORDER_FORCE ) / (Math.pow((((float)height) - p.getPosition().y),2));
 
-            if ( (int)(1000 * otherWayVelX) != 0 || (int)(1000 * otherWayVelY) != 0 ) {
-                return new PVector(otherWayVelX, otherWayVelY).mult(BORDER_FORCE);
-            } else {
-                return DrawingUtilities.getOriginVector();
-            }
+
+//            if ( p.getPosition().x < BORDER || p.getPosition().x + BORDER > app.width ) {
+//                float borderDist = p.getPosition().x < BORDER
+//                        ? p.getPosition().x
+//                        : width - p.getPosition().x;
+//                otherWayVelX = p.getVelocity().x / borderDist;
+//            }
+//
+//            if ( p.getPosition().y < BORDER || p.getPosition().y + BORDER > height ) {
+//                float borderDist = (p.getPosition().y < BORDER ? p.getPosition().y : height - p.getPosition().y );
+//                otherWayVelY = p.getVelocity().y / borderDist;
+//            }
+
+//            if ( (int)(1000 * otherWayVelX) != 0 || (int)(1000 * otherWayVelY) != 0 ) {
+            return new PVector(otherWayVelX, otherWayVelY).mult(BORDER_FORCE);
+//            } else {
+//                return DrawingUtilities.getOriginVector();
+//            }
         };
 
         Particle.ParticleBorderAccelReaction borderAcc = (app, p) -> {
@@ -126,7 +196,7 @@ public class FlockingExample extends PApplet {
             //if ( (int)(otherWayAccX) != 0 || (int)otherWayAccY != 0 ) {
             //    return new PVector(otherWayAccX * BORDER_FORCE, otherWayAccY * BORDER_FORCE);
             //} else {
-                return DrawingUtilities.getOriginVector();
+            return DrawingUtilities.getOriginVector();
             //}
         };
 
@@ -138,14 +208,14 @@ public class FlockingExample extends PApplet {
                             i,
                             new PVector(random(WIDTH), random(HEIGHT)),
                             DrawingUtilities.getOriginVector(),
-                            PVector.random2D().mult(5),
+                            PVector.random2D().mult(3),
                             (app,p) -> {   // drawing function
 
                                 pushMatrix();
                                 pushStyle();
                                 translate(p.getPosition().x, p.getPosition().y);
                                 text(p.getId(),0,0);
-                                ellipse(0,0,5,5);
+                                ellipse(0,0,particle_size,particle_size);
                                 stroke(0,128,0);
                                 DrawingUtilities.arrowLine(app,0,0,p.getVelocity().x * 10, p.getVelocity().y * 10, 0, .333f, true);
                                 popStyle();
@@ -156,7 +226,8 @@ public class FlockingExample extends PApplet {
                             follow,
                             cohese,
                             borderVel,
-                            borderAcc
+                            borderAcc,
+                            null
                     )
             );
         }
@@ -173,13 +244,12 @@ public class FlockingExample extends PApplet {
 
     public void draw() {
 
-        if ( stepFrame ) {
-            stepFrame = false;
+        //if ( stepFrame ) {
+        //    stepFrame = false;
             background(BACKGROUND);
             flock.updateUsingAll(this);
             flock.draw(this);
-
-        }
+        //}
 
     }
 

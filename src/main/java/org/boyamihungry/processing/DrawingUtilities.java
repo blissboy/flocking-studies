@@ -8,7 +8,10 @@ import processing.core.PVector;
  */
 public class DrawingUtilities {
 
-    static final PVector originVector = new PVector(0f,0f,0f);
+    private static final PVector originVector = new PVector(0f,0f,0f);
+    private static final PVector yNormalVector = new PVector(0f,1f,0f);
+    private static final PVector xNormalVector = new PVector(1f,0f,0f);
+
 
     /*
         * Draws a lines with arrows of the given angles at the ends.
@@ -84,4 +87,29 @@ public class DrawingUtilities {
         return DrawingUtilities.originVector.copy();
     }
 
+
+//    public QuadraticEquation getQEQFromThreePoints(PVector p1, PVector p2, PVector p3) {
+//        return getQEQFromThreePoints(p1.x, p1.y, p2.x, p2.y, p3.x, p3.y);
+//    }
+//    public QuadraticEquation getQEQFromThreePoints(float p1x, float p1y, float p2x, float p2y, float p3x, float p3y) {
+//
+//
+//        float a,b,c;
+//
+//
+//
+//        return (x) -> {
+//
+//        };
+//
+//
+//
+//
+//    }
+//
+//
+//    @FunctionalInterface
+//    public interface QuadraticEquation {
+//        int getY(int x);
+//    }
 }

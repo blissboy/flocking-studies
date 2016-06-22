@@ -3,6 +3,14 @@ package org.boyamihungry.processing;
 import processing.core.PApplet;
 import processing.core.PVector;
 
+import java.util.Collections;
+import java.util.Set;
+import java.util.function.*;
+import java.util.stream.Collector;
+import java.util.stream.Collectors;
+
+import static javafx.scene.input.KeyCode.T;
+
 /**
  * Created by patwheaton on 6/6/16.
  */
@@ -87,29 +95,93 @@ public class DrawingUtilities {
         return DrawingUtilities.originVector.copy();
     }
 
+    /**
+         * Returns a {@code Collector} that produces the sum of a PVector-valued
+         * function applied to the input elements.  If no elements are present,
+         * the result is 0.
+         *
+         * @param <PVector> the type of the input elements
+         * @param mapper a function extracting the property to be summed
+         * @return a {@code Collector} that produces the sum of a derived property
+         */
+//        public static <PVector> Collector<PVector, ?, PVector> summingPVector(ToPVectorFunction<? super T> mapper) {
+//            return new CollectorImpl<>(
+//                    () -> getOriginVector().copy(),
+//                    (a, t) -> { a.add((processing.core.PVector)t); },
+//                    (a, b) -> { a.add((processing.core.PVector)b); return a; },
+//                    a -> a,
+//                    Collections.emptySet());
+//        }
 
-//    public QuadraticEquation getQEQFromThreePoints(PVector p1, PVector p2, PVector p3) {
-//        return getQEQFromThreePoints(p1.x, p1.y, p2.x, p2.y, p3.x, p3.y);
+    /**
+     * Simple implementation class for {@code Collector}.
+     *
+     * @param <T> the type of elements to be collected
+     * @param <R> the type of the result
+     */
+//    static class CollectorImpl<T, A, R> implements Collector<T, A, R> {
+//        private final Supplier<A> supplier;
+//        private final BiConsumer<A, T> accumulator;
+//        private final BinaryOperator<A> combiner;
+//        private final Function<A, R> finisher;
+//        private final Set<Characteristics> characteristics;
+//
+//        CollectorImpl(Supplier<A> supplier,
+//                      BiConsumer<A, T> accumulator,
+//                      BinaryOperator<A> combiner,
+//                      Function<A,R> finisher,
+//                      Set<Characteristics> characteristics) {
+//            this.supplier = supplier;
+//            this.accumulator = accumulator;
+//            this.combiner = combiner;
+//            this.finisher = finisher;
+//            this.characteristics = characteristics;
+//        }
+//
+//        CollectorImpl(Supplier<A> supplier,
+//                      BiConsumer<A, T> accumulator,
+//                      BinaryOperator<A> combiner,
+//                      Set<Characteristics> characteristics) {
+//            this(supplier, accumulator, combiner, castingIdentity(), characteristics);
+//        }
+//
+//        @Override
+//        public BiConsumer<A, T> accumulator() {
+//            return accumulator;
+//        }
+//
+//        @Override
+//        public Supplier<A> supplier() {
+//            return supplier;
+//        }
+//
+//        @Override
+//        public BinaryOperator<A> combiner() {
+//            return combiner;
+//        }
+//
+//        @Override
+//        public Function<A, R> finisher() {
+//            return finisher;
+//        }
+//
+//        @Override
+//        public Set<Characteristics> characteristics() {
+//            return characteristics;
+//        }
 //    }
-//    public QuadraticEquation getQEQFromThreePoints(float p1x, float p1y, float p2x, float p2y, float p3x, float p3y) {
-//
-//
-//        float a,b,c;
-//
-//
-//
-//        return (x) -> {
-//
-//        };
-//
-//
-//
-//
-//    }
-//
-//
-//    @FunctionalInterface
-//    public interface QuadraticEquation {
-//        int getY(int x);
-//    }
+
+    @FunctionalInterface
+    public interface ToPVectorFunction<T> {
+
+        /**
+         * Applies this function to the given argument.
+         *
+         * @param value the function argument
+         * @return the function result
+         */
+        PVector applyAsPVector(T value);
+    }
+
+
 }

@@ -3,11 +3,15 @@ package org.boyamihungry.processing.flocking;
 import controlP5.ControlP5;
 import controlP5.ControlP5Constants;
 import org.boyamihungry.processing.DrawingUtilities;
+import org.boyamihungry.processing.PVectorSummingCollector;
 import processing.core.PApplet;
 import processing.core.PVector;
 import processing.event.KeyEvent;
 
 import javax.validation.constraints.NotNull;
+
+import static org.boyamihungry.processing.DrawingUtilities.getOriginVector;
+import static org.boyamihungry.processing.flocking.Particle.FOLLOW_DISTANCE;
 
 /**
  * Created by patwheaton on 5/26/16.
@@ -15,20 +19,20 @@ import javax.validation.constraints.NotNull;
 public class FlockingExample extends PApplet {
 
 
-    private int AVOID = 15;
+    private int AVOID = 5;
     private float AVOID_FORCE = 20f;
     private int COHESE = 50;
     private float COHESE_FORCE = 2f;
     private int FOLLOW = 50;
     private float FOLLOW_FORCE = .2f;
 
-    private int WIDTH = 1440;
+    private int WIDTH = 1920;
     private int HEIGHT = 1080;
-    private int NUM_PARTICLES = 400;
+    private int NUM_PARTICLES = 200;
 
     private int particle_size = 5;
 
-    public static final int BACKGROUND = 50;
+    public static final int BACKGROUND = 200;
 
     private int BORDER = 320;
     private float BORDER_FORCE = -1f;
@@ -36,6 +40,14 @@ public class FlockingExample extends PApplet {
     private @NotNull Flock flock;
 
     private ControlP5 cp5;
+
+    private int flockFrameWidth = 1280;
+    private int flockFrameHeight = 800;
+    private int particleNeighborHeight = 540;
+
+
+
+
 
 
     boolean stepFrame = false;
@@ -51,17 +63,6 @@ public class FlockingExample extends PApplet {
     public void setup() {
 
         this.frameRate(90f);
-
-//        private int AVOID = 15;
-//        private float AVOID_FORCE = 20f;
-//        private int COHESE = 50;
-//        private float COHESE_FORCE = 2f;
-//        private int FOLLOW = 50;
-//        private float FOLLOW_FORCE = .2f;
-//
-//        private int WIDTH = 1440;
-//        private int HEIGHT = 1080;
-//        private int NUM_PARTICLES = 400;
 
         cp5 = new ControlP5(this);
         final int SLIDER_WIDTH = 200;
@@ -113,104 +114,53 @@ public class FlockingExample extends PApplet {
                 .setValue(particle_size)
                 .setColorCaptionLabel(ControlP5.BLUE).getValueLabel().getFont().setSize(30);
 
+        // avoid means to find position of each particle around me, and steer away from each one in proportion
+        // to how close I am to them.
         Particle.ParticleAvoidCalculator avoid = (app, affectingP, affectedP) -> {
             // get distance between
             float dist = affectingP.getPosition().dist(affectedP.getPosition());
             if ( dist < AVOID ) {
-                PVector diff = PVector.sub(affectingP.getVelocity(), affectedP.getVelocity());
-                return diff.div(dist).mult(AVOID_FORCE);
+                return PVector.sub(affectedP.getPosition(), affectingP.getPosition())
+                        .normalize()
+                        .div(dist)
+                        .mult(AVOID_FORCE);
             } else {
-                return DrawingUtilities.getOriginVector();
+                return getOriginVector();
             }
-
         };
 
+        // follow means to look at velocity of particles near me, then follow that vel.
         Particle.ParticleFollowCalculator follow = (app, affectingP, affectedP) -> {
-            // get distance between
-            float dist = affectingP.getPosition().dist(affectedP.getPosition());
-            if ( dist < FOLLOW ) {
-                return affectingP.getVelocity().copy().mult(FOLLOW_FORCE);
-            } else {
-                return DrawingUtilities.getOriginVector();
-            }
+            return affectingP.getVelocity().copy().sub(affectedP.getVelocity());
         };
 
 
+        // cohese means to look at locations of particles around me and steer towards them.
         Particle.ParticleCoheseCalculator cohese = (app, affectingP, affectedP) -> {
-            // get distance between
-            float dist = affectingP.getPosition().dist(affectedP.getPosition());
-            if ( dist < COHESE ) {
-                // we want to cohese to where they are going
-                return affectingP.getVelocity().copy().mult(COHESE_FORCE);
-            } else {
-                return DrawingUtilities.getOriginVector();
-            }
-
+            return affectingP.getPosition().copy().sub(affectedP.getPosition());
         };
 
-        Particle.ParticleBorderVelocityReaction borderVel = (app, p) -> {
-            //float otherWayVelX = 0f;
-            //float otherWayVelY = 0f;
+        Particle.ParticleBorderVelocityReaction borderVel =
+                (app, p) -> {
+                    // left border
+                    float otherWayVelX = ( p.getVelocity().x + BORDER_FORCE ) / (p.getPosition().x * p.getPosition().x);
+                    otherWayVelX += ( p.getVelocity().x - BORDER_FORCE ) / (Math.pow(((float)width) - p.getPosition().x,2));
 
-            // left border
-            float otherWayVelX = ( p.getVelocity().x + BORDER_FORCE ) / (p.getPosition().x * p.getPosition().x);
-            otherWayVelX += ( p.getVelocity().x - BORDER_FORCE ) / (Math.pow(((float)width) - p.getPosition().x,2));
+                    float otherWayVelY = ( p.getVelocity().y + BORDER_FORCE ) / (p.getPosition().y * p.getPosition().y);
+                    otherWayVelY += ( p.getVelocity().y - BORDER_FORCE ) / (Math.pow((((float)height) - p.getPosition().y),2));
 
-            float otherWayVelY = ( p.getVelocity().y + BORDER_FORCE ) / (p.getPosition().y * p.getPosition().y);
-            otherWayVelY += ( p.getVelocity().y - BORDER_FORCE ) / (Math.pow((((float)height) - p.getPosition().y),2));
-
-
-//            if ( p.getPosition().x < BORDER || p.getPosition().x + BORDER > app.width ) {
-//                float borderDist = p.getPosition().x < BORDER
-//                        ? p.getPosition().x
-//                        : width - p.getPosition().x;
-//                otherWayVelX = p.getVelocity().x / borderDist;
-//            }
-//
-//            if ( p.getPosition().y < BORDER || p.getPosition().y + BORDER > height ) {
-//                float borderDist = (p.getPosition().y < BORDER ? p.getPosition().y : height - p.getPosition().y );
-//                otherWayVelY = p.getVelocity().y / borderDist;
-//            }
-
-//            if ( (int)(1000 * otherWayVelX) != 0 || (int)(1000 * otherWayVelY) != 0 ) {
-            return new PVector(otherWayVelX, otherWayVelY).mult(BORDER_FORCE);
-//            } else {
-//                return DrawingUtilities.getOriginVector();
-//            }
-        };
-
-        Particle.ParticleBorderAccelReaction borderAcc = (app, p) -> {
-            float otherWayAccX = 0f;
-            float otherWayAccY = 0f;
-
-            if ( p.getPosition().x < BORDER || p.getPosition().x + BORDER > width ) {
-                float borderDist = (p.getPosition().x < BORDER ? p.getPosition().x : p.getPosition().x - width);
-                otherWayAccX = (p.getAcceleration().x * borderDist) / (BORDER - Math.abs(borderDist));
-            }
-
-            if ( p.getPosition().y < BORDER || p.getPosition().y + BORDER > height ) {
-                float borderDist = (p.getPosition().y < BORDER ? p.getPosition().y : p.getPosition().y - height);
-                otherWayAccY = (p.getAcceleration().y * borderDist) / (BORDER - Math.abs(borderDist));
-            }
-
-            //if ( (int)(otherWayAccX) != 0 || (int)otherWayAccY != 0 ) {
-            //    return new PVector(otherWayAccX * BORDER_FORCE, otherWayAccY * BORDER_FORCE);
-            //} else {
-            return DrawingUtilities.getOriginVector();
-            //}
-        };
+                    return new PVector(otherWayVelX, otherWayVelY).mult(BORDER_FORCE);
+                };
 
         SimpleFlock flock = new SimpleFlock();
 
         for (int i = 0; i < NUM_PARTICLES; i++) {
             flock.addMember(
-                    new Particle(
+                    new Particle.Builder(
                             i,
-                            new PVector(random(WIDTH), random(HEIGHT)),
-                            DrawingUtilities.getOriginVector(),
+                            new PVector(random(flockFrameWidth), random(flockFrameHeight)),
                             PVector.random2D().mult(3),
                             (app,p) -> {   // drawing function
-
                                 pushMatrix();
                                 pushStyle();
                                 translate(p.getPosition().x, p.getPosition().y);
@@ -220,15 +170,71 @@ public class FlockingExample extends PApplet {
                                 DrawingUtilities.arrowLine(app,0,0,p.getVelocity().x * 10, p.getVelocity().y * 10, 0, .333f, true);
                                 popStyle();
                                 popMatrix();
+                            })
+                            .withAvoidFlockCalculator( (p,f) -> {
+                                PVector theSum = flock.getNeighborsWithinDistance(p.getPosition(), AVOID)
+                                        .stream()
+                                        .filter(neighborP -> (neighborP.getId() != p.getId()))
+                                        .map( member -> PVector.sub(p.getPosition(), member.getPosition()).div(p.getPosition().dist(member.getPosition().mult(AVOID_FORCE))))
+                                        .collect(new PVectorSummingCollector());
 
-                            },
-                            avoid,
-                            follow,
-                            cohese,
-                            borderVel,
-                            borderAcc,
-                            null
-                    )
+                                return theSum;
+
+                            })
+                            .withCoheseToFlockCalculator((p,f) -> {
+                                PVector theSum = flock.getNeighborsWithinDistance(p.getPosition(), FOLLOW_DISTANCE)
+                                        .stream()
+                                        .filter(closeP -> (closeP.getId() != p.getId()))
+                                        .map( member -> member.getPosition().copy().sub(p.getPosition() ))
+                                        .collect(new PVectorSummingCollector());
+
+                                return theSum;
+                            })
+                            .withFollowFlockCalculator(
+                                    ( p, f) -> { // follow flock
+                                        PVector theSum = flock.getNeighborsWithinDistance(p.getPosition(), FOLLOW_DISTANCE)
+                                                .stream()
+                                                .filter(closeP -> (closeP.getId() != p.getId()))
+                                                .map( member -> member.getVelocity().copy().sub(p.getVelocity()) )
+                                                .collect(new PVectorSummingCollector());
+
+                                        return theSum;
+                                    })
+                            .withWiggle((p) -> {return PVector.random2D().setMag(.1f);})
+                            .withTeleport(
+                                    (p) -> {
+                                        PVector resultingPosition = p.getPosition();
+
+                                        /* this way wraps around */
+                                        if ( p.getPosition().x < 0 ) {
+                                            resultingPosition.x += flockFrameWidth;
+                                        } else if (p.getPosition().x > flockFrameWidth ) {
+                                            resultingPosition.x -= flockFrameWidth;
+                                        }
+                                        if ( p.getPosition().y < 0 ) {
+                                            resultingPosition.y += flockFrameHeight;
+                                        } else if (p.getPosition().y > flockFrameHeight ) {
+                                            resultingPosition.y -= flockFrameHeight;
+                                        }
+
+                                        /* this way just bounces them ******************************
+
+                                        if ( getPosition().x < 0 || getPosition().x > app.width ) {
+                                            velocity.set(getVelocity().x * -1, getVelocity().y);
+                                        }
+
+                                        if ( getPosition().y < 0 || getPosition().y > app.height) {
+                                            velocity.set(getVelocity().x, getVelocity().y * -1);
+                                        }
+
+                                        **************************************/
+
+                                        return resultingPosition;
+
+                                    }
+                            )
+                            .build()
+
             );
         }
 
@@ -244,11 +250,23 @@ public class FlockingExample extends PApplet {
 
     public void draw() {
 
+
         //if ( stepFrame ) {
         //    stepFrame = false;
-            background(BACKGROUND);
-            flock.updateUsingAll(this);
-            flock.draw(this);
+        background(BACKGROUND);
+
+        // draw flocking frame
+        pushStyle();
+        stroke(0);
+        strokeWeight(4);
+        line(flockFrameWidth,0,flockFrameWidth,height);
+        line(0,flockFrameHeight,flockFrameWidth,flockFrameHeight);
+        line(flockFrameWidth,particleNeighborHeight,width,particleNeighborHeight);
+        popStyle();
+
+        flock.updateUsingAll(this);
+        flock.draw(this);
+
         //}
 
     }

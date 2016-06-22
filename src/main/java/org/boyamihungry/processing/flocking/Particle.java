@@ -5,82 +5,49 @@ import processing.core.PApplet;
 import processing.core.PVector;
 
 import javax.validation.constraints.NotNull;
+import java.util.Optional;
+import java.util.Set;
+
 
 /**
  * Created by patwheaton on 5/25/16.
  */
 public class Particle {
 
+    public static final int FOLLOW_DISTANCE = 50;
+    public static final float FOLLOW_FORCE = 2f;
+
+    public static final int COHESE_DISTANCE = 20;
+    public static final float COHESE_FORCE = 2f;
+
+    public static final float MAX_STEER_FORCE = .11f;
+
     @NotNull
     private int id;
     @NotNull
     private PVector position;
     @NotNull
-    private PVector acceleration;
+    private PVector acceleration = DrawingUtilities.getOriginVector().copy();
     @NotNull
     private PVector velocity;
     @NotNull
     private ParticleDraw drawer;
 
     @NotNull
-    private ParticleFollowCalculator followCalculator =
-            (app, vec1, vec2) -> {return DrawingUtilities.getOriginVector();};
+    private ParticleFollowFlockCalculator followFlockCalculator;
 
     @NotNull
-    private ParticleCoheseCalculator coheseCalculator =
-            (app, vec1, vec2) -> {return DrawingUtilities.getOriginVector();};
-    @NotNull
-    private ParticleAvoidCalculator avoidCalculator =
-            (app, vec1, vec2) -> {return DrawingUtilities.getOriginVector();};
+    private ParticleCoheseFlockCalculator coheseFlockCalculator;
 
     @NotNull
-    private ParticleFollowFlockCalculator followFlockCalculator =
-            (app, p, flock) -> {
-                PVector followSum = DrawingUtilities.getOriginVector();
-                for ( Particle other: flock.getMembers()) {
-                    if ( other.getId() != p.getId() ) {
-                        followSum.add(p.getFollowCalculator().follow(app,other,p));
-                    }
-                }
-                float mag = velocity.mag();
-                velocity = velocity.add(followSum);
-                velocity = velocity.setMag(mag);
-            };
+    private ParticleAvoidFlockCalculator avoidFlockCalculator;
 
     @NotNull
-    private ParticleCoheseFlockCalculator coheseFlockCalculator =
-            (app, p, flock) -> {
-                PVector coheseSum = DrawingUtilities.getOriginVector();
-                for ( Particle other: flock.getMembers()) {
-                    if ( other.getId() != p.getId() ) {
-                        coheseSum.add(p.getCoheseCalculator().cohese(app,other,p));
-                    }
-                }
-                float mag = p.getVelocity().mag();
-                velocity = velocity.add( coheseSum );
-                velocity = velocity.setMag(mag);
-            };
+    private Wiggler wiggler;
 
     @NotNull
-    private ParticleAvoidFlockCalculator avoidFlockCalculator =
-            (app, p, flock) -> {
-                PVector avoidSum = DrawingUtilities.getOriginVector();
-                for ( Particle other: flock.getMembers()) {
-                    if ( other.getId() != p.getId() ) {
-                        avoidSum.add(p.getAvoidCalculator().avoid(app,other,p));
-                    }
-                }
-                float mag = velocity.mag();
-                velocity = velocity.add( avoidSum );
-                velocity = velocity.setMag(mag);
-            };
+    private ParticleBorderTeleporter teleporter;
 
-    @NotNull
-    private Wiggler wiggler =
-            () -> {
-              this.velocity.add(PVector.random2D());
-              return this;
-            };
 
 
     //todo: how to use this?
@@ -93,43 +60,50 @@ public class Particle {
             (app, p) -> {return DrawingUtilities.getOriginVector();};
 
 
-    // todo: change to builder
     public Particle(int id,
                     PVector position,
-                    PVector acceleration,
                     PVector velocity,
                     ParticleDraw drawer,
-                    ParticleAvoidCalculator avoid,
-                    ParticleFollowCalculator follow,
-                    ParticleCoheseCalculator cohese,
-                    ParticleBorderVelocityReaction borderVelReaction,
-                    ParticleBorderAccelReaction borderAccReaction,
-                    Wiggler wiggler) {
+                    ParticleAvoidFlockCalculator avoidFlock,
+                    ParticleCoheseFlockCalculator coheseFlock,
+                    ParticleFollowFlockCalculator followFlock,
+                    Wiggler wiggler,
+                    ParticleBorderTeleporter teleporter) {
 
-
-
-        this.id = id;
-        this.acceleration = acceleration;
         this.velocity = velocity;
         this.drawer = drawer;
         this.position = position;
-        this.borderVelReaction = borderVelReaction;
-        this.borderAccReaction = borderAccReaction;
-
-        this.coheseCalculator = cohese != null ? cohese : coheseCalculator;
-        this.followCalculator = follow != null ? follow : followCalculator;
-        this.avoidCalculator = avoid != null ? avoid : avoidCalculator;
+        this.coheseFlockCalculator = coheseFlock;
+        this.followFlockCalculator = followFlock;
+        this.avoidFlockCalculator = avoidFlock;
         this.wiggler = wiggler != null ? wiggler : this.wiggler;
+        this.teleporter = teleporter;
 
     }
 
-    public void step () {
-        this.wiggler.wiggle();
-        this.position.add(velocity);
-        this.velocity.add(acceleration);
-        this.acceleration.setMag(0f);
+    public void step (Optional<Flock> flock) {
+
+        flock.ifPresent(
+                (f) -> {
+                    this.acceleration = followFlockCalculator.followFlock(this, f);
+                    this.acceleration = avoidFlockCalculator.avoidFlock(this, f);
+                    this.acceleration = getCoheseToFlockCalculator().coheseToFlock(this, f);
+                }
+        );
+
+        this.velocity.add(acceleration.limit(MAX_STEER_FORCE));
+        this.wiggler.wiggle(this);
         this.velocity.limit(5);
+        this.position.add(velocity);
+        this.acceleration.setMag(0f);
+        this.teleporter.teleportIfNeeded(this);
     }
+
+    public Particle accelerate(PVector p) {
+        acceleration.add(p);
+        return this;
+    }
+
 
 
     @FunctionalInterface
@@ -144,9 +118,9 @@ public class Particle {
     }
     @FunctionalInterface
     public interface ParticleFollowFlockCalculator {
-        public void followFlock(PApplet app,
-                                Particle affectedP,
-                                Flock flock);
+        public PVector followFlock(//PApplet app,
+                                   Particle affectedP,
+                                   Flock flock);
     }
     @FunctionalInterface
     public interface ParticleAvoidCalculator {
@@ -154,12 +128,28 @@ public class Particle {
                              Particle affectedP,
                              Particle affectingP);
     }
+
+
+    //TODO: for all the *flock calculators, they should return vector, and likely be renamed to admit that.
+
+    @FunctionalInterface
+    public interface ParticleInteractionCalculator {
+        public PVector getInteractionResult(Particle affected, Particle affector);
+    }
+
+
+
     @FunctionalInterface
     public interface ParticleAvoidFlockCalculator {
-        public void avoidFlock(PApplet app,
-                               Particle affectedP,
-                               Flock flock);
+        public PVector avoidFlock(//PApplet app,
+                                  Particle affectedP,
+                                  Flock flock);
     }
+
+
+
+
+
     @FunctionalInterface
     public interface ParticleCoheseCalculator {
         public PVector cohese(PApplet app,
@@ -168,9 +158,9 @@ public class Particle {
     }
     @FunctionalInterface
     public interface ParticleCoheseFlockCalculator {
-        public void coheseToFlock(PApplet app,
-                                  Particle affectedP,
-                                  Flock flock);
+        public PVector coheseToFlock(//PApplet app,
+                                     Particle affectedP,
+                                     Flock flock);
     }
 
     @FunctionalInterface
@@ -186,8 +176,18 @@ public class Particle {
     }
 
     @FunctionalInterface
+    public interface ParticleFollowNeighborsFilter {
+        public Set getNeighborsForFollow(Particle p, Flock f);
+    }
+
+    @FunctionalInterface
     public interface Wiggler {
-        public Particle wiggle();
+        public PVector wiggle(Particle p);
+    }
+
+    @FunctionalInterface
+    public interface ParticleBorderTeleporter {
+        public PVector teleportIfNeeded(Particle p);
     }
 
 
@@ -211,18 +211,6 @@ public class Particle {
         return velocity;
     }
 
-    public ParticleFollowCalculator getFollowCalculator() {
-        return followCalculator;
-    }
-
-    public ParticleCoheseCalculator getCoheseCalculator() {
-        return coheseCalculator;
-    }
-
-    public ParticleAvoidCalculator getAvoidCalculator() {
-        return avoidCalculator;
-    }
-
     public ParticleFollowFlockCalculator getFollowFlockCalculator() {
         return followFlockCalculator;
     }
@@ -235,62 +223,136 @@ public class Particle {
         return avoidFlockCalculator;
     }
 
-    public void borders(PApplet app) {
-//        float mag = acceleration.mag();
-//        acceleration.add(this.borderAccReaction.borderReact(app, this));
-//        acceleration.setMag(mag);
 
-//        float mag = velocity.mag();
+
+//    public void borders(PApplet app) {
+////        float mag = acceleration.mag();
+////        acceleration.add(this.borderAccReaction.borderReact(app, this));
+////        acceleration.setMag(mag);
 //
-//        // debug
-//        PVector borderVelReaction =
-//                this.borderVelReaction.borderReact(app, this);
+////        float mag = velocity.mag();
+////
+////        // debug
+////        PVector borderVelReaction =
+////                this.borderVelReaction.borderReact(app, this);
+////
+////        if ( ! borderVelReaction.equals(DrawingUtilities.getOriginVector())) {
+////            app.pushStyle();
+////            app.pushMatrix();
+////            app.translate(this.getPosition().x, this.getPosition().y);
+////            app.stroke(255, 0, 0);
+////            DrawingUtilities.arrowLine(
+////                    app,
+////                    0,
+////                    0,
+////                    borderVelReaction.x * 5,
+////                    borderVelReaction.y * 5,
+////                    0,
+////                    0.333f,
+////                    true);
+////            //app.ellipse();
+////            app.popMatrix();
+////            app.popStyle();
+////            // end debug
+////        }
+////        velocity.add(this.borderVelReaction.borderReact(app, this));
+////        //velocity.setMag(mag);
 //
-//        if ( ! borderVelReaction.equals(DrawingUtilities.getOriginVector())) {
-//            app.pushStyle();
-//            app.pushMatrix();
-//            app.translate(this.getPosition().x, this.getPosition().y);
-//            app.stroke(255, 0, 0);
-//            DrawingUtilities.arrowLine(
-//                    app,
-//                    0,
-//                    0,
-//                    borderVelReaction.x * 5,
-//                    borderVelReaction.y * 5,
-//                    0,
-//                    0.333f,
-//                    true);
-//            //app.ellipse();
-//            app.popMatrix();
-//            app.popStyle();
-//            // end debug
+//        /* this way wraps around */
+//        if ( getPosition().x < 0 ) {
+//            this.position.x += app.width;
+//        } else if (getPosition().x > app.width ) {
+//            this.position.x -= app.width;
 //        }
-//        velocity.add(this.borderVelReaction.borderReact(app, this));
-//        //velocity.setMag(mag);
+//        if ( getPosition().y < 0 ) {
+//            this.position.y += app.height;
+//        } else if (getPosition().y > app.height ) {
+//            this.position.y -= app.height;
+//        }
+//
+//        /* this way just bounces them ******************************
+//
+//        if ( getPosition().x < 0 || getPosition().x > app.width ) {
+//            velocity.set(getVelocity().x * -1, getVelocity().y);
+//        }
+//
+//        if ( getPosition().y < 0 || getPosition().y > app.height) {
+//            velocity.set(getVelocity().x, getVelocity().y * -1);
+//        }
+//
+//        **************************************/
+//    }
 
-        /* this way wraps around */
-        if ( getPosition().x < 0 ) {
-            this.position.x += app.width;
-        } else if (getPosition().x > app.width ) {
-            this.position.x -= app.width;
+
+    public static class Builder {
+
+        // required
+        @NotNull
+        private int id;
+        @NotNull
+        private PVector position;
+        @NotNull
+        private PVector velocity;
+        @NotNull
+        private ParticleDraw drawer;
+
+        @NotNull
+        private ParticleFollowNeighborsFilter followNeighborsCalculator =
+                (p, f) -> {
+                    return f.getNeighborsWithinDistance(p.getPosition().copy(), FOLLOW_DISTANCE);
+                };
+
+        @NotNull
+        private ParticleCoheseFlockCalculator builder_coheseFlockCalculator;
+        @NotNull
+        private ParticleAvoidFlockCalculator avoidFlockCalculator;
+        @NotNull
+        private ParticleFollowFlockCalculator followFlockCalculator;
+        @NotNull
+        private Wiggler wiggler;
+        @NotNull
+        private ParticleBorderTeleporter teleporter;
+
+
+        public Builder(int id, PVector position, PVector velocity, ParticleDraw drawer ) {
+            this.id = id;
+            this.position = position;
+            this.velocity = velocity;
+            this.drawer = drawer;
         }
-        if ( getPosition().y < 0 ) {
-            this.position.y += app.height;
-        } else if (getPosition().y > app.height ) {
-            this.position.y -= app.height;
+
+        // todo: add Builder constructor with Particle as arg
+
+        public Builder withAvoidFlockCalculator(ParticleAvoidFlockCalculator avoidFlock) {
+            this.avoidFlockCalculator = avoidFlock;
+            return this;
         }
 
-        /* this way just bounces them ******************************
-
-        if ( getPosition().x < 0 || getPosition().x > app.width ) {
-            velocity.set(getVelocity().x * -1, getVelocity().y);
+        public Builder withFollowFlockCalculator(ParticleFollowFlockCalculator followFlock) {
+            this.followFlockCalculator = followFlock;
+            return this;
         }
 
-        if ( getPosition().y < 0 || getPosition().y > app.height) {
-            velocity.set(getVelocity().x, getVelocity().y * -1);
+        public Builder withCoheseToFlockCalculator(ParticleCoheseFlockCalculator coheseToFlock) {
+            this.builder_coheseFlockCalculator = coheseToFlock;
+            return this;
         }
 
-        **************************************/
+        public Builder withWiggle(Wiggler wiggler) {
+            this.wiggler = wiggler;
+            return this;
+        }
+
+        public Builder withTeleport(ParticleBorderTeleporter teleporter) {
+            this.teleporter = teleporter;
+            return this;
+        }
+
+        public Particle build() {
+            return new Particle(id, position, velocity,drawer,avoidFlockCalculator,builder_coheseFlockCalculator,followFlockCalculator,wiggler,teleporter);
+        }
+
     }
+
 
 }

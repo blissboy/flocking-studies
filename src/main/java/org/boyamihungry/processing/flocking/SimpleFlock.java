@@ -30,20 +30,9 @@ public class SimpleFlock implements Flock {
     public Set<Particle> getNeighborsWithinDistance(@NotNull PVector location,
                                                     @NotNull int distance) {
 
-        Set<Particle> neighbors =
-                getMembers().stream()
+        return getMembers().stream()
                         .filter(p -> location.dist(p.getPosition()) < distance)
                         .collect(Collectors.toSet());
-
-//        Set<Particle> neighbors = new HashSet<>();
-//
-//        for (Particle p: getMembers()) {
-//            if ( location.dist(p.getPosition()) < distance ) {
-//                neighbors.add(p);
-//            }
-//        }
-
-        return neighbors;
     }
 
 

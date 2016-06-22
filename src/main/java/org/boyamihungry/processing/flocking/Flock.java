@@ -3,6 +3,7 @@ package org.boyamihungry.processing.flocking;
 import processing.core.PApplet;
 import processing.core.PVector;
 
+import java.util.Optional;
 import java.util.Set;
 
 /**
@@ -14,7 +15,7 @@ public interface Flock {
     public Set<Particle> getMembers();
     public Set<Particle> getNeighborsWithinDistance(PVector location, int distance);
 
-    default public void updateUsingAll(PApplet app){
+    default void updateUsingAll(PApplet app){
             followAll(app);
             avoidAll(app);
             coheseAll(app);
@@ -23,35 +24,28 @@ public interface Flock {
         };
     default public void coheseAll(PApplet app){
             for(Particle p:getMembers()){
-                p.getCoheseToFlockCalculator().coheseToFlock(app,p,this);
+                p.getCoheseToFlockCalculator().coheseToFlock(p,this);
             }
         };
     default public void followAll(PApplet app){
         for(Particle p:getMembers()){
-            p.getFollowFlockCalculator().followFlock(app,p,this);
+            p.getFollowFlockCalculator().followFlock(p,this);
         }
-
-
-
-    // change followFlockCalc to be followFlock
-
-
-
     };
     default public void avoidAll(PApplet app){
             for(Particle p:getMembers()){
-                p.getAvoidWithinFlockCalculator().avoidFlock(app,p,this);
+                p.getAvoidWithinFlockCalculator().avoidFlock(p,this);
             }
         };
     default public void stepAll(PApplet app) {
         for(Particle p:getMembers()){
-            p.step();
+            p.step(Optional.of(this));
         }
     }
     default public void bordersAll(PApplet app) {
-        for(Particle p:getMembers()){
-            p.borders(app);
-        }
+//        for(Particle p:getMembers()){
+//            p.get(app);
+//        }
     }
     default public void draw(PApplet app) {
         for (Particle p : getMembers()) {

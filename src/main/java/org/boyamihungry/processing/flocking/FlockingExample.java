@@ -18,19 +18,27 @@ import static org.boyamihungry.processing.flocking.Particle.FOLLOW_DISTANCE;
  */
 public class FlockingExample extends PApplet {
 
-
+    // variables tied to controls
     private int AVOID = 5;
     private float AVOID_FORCE = 20f;
+
     private int COHESE = 50;
     private float COHESE_FORCE = 2f;
+
     private int FOLLOW = 50;
     private float FOLLOW_FORCE = .2f;
+
+    private int particle_size = 5;
+
+    private boolean pauseFlock = false;
+    private int featuredParticleId = -1;
+    // end variables tied to controls
+
 
     private int WIDTH = 1920;
     private int HEIGHT = 1080;
     private int NUM_PARTICLES = 200;
 
-    private int particle_size = 5;
 
     public static final int BACKGROUND = 200;
 
@@ -63,56 +71,7 @@ public class FlockingExample extends PApplet {
     public void setup() {
 
         this.frameRate(90f);
-
-        cp5 = new ControlP5(this);
-        final int SLIDER_WIDTH = 200;
-        final int SLIDER_HEIGHT = 20;
-        final int SLIDER_LEFT = 40;
-        final int vSpacing = 15;
-        int count = 0;
-        cp5.addSlider("AVOID")
-                .setPosition(SLIDER_LEFT, (vSpacing + SLIDER_HEIGHT) * ++count)
-                .setSize(SLIDER_WIDTH, SLIDER_HEIGHT)
-                .setRange(1, 100)
-                .setValue(AVOID)
-                .setColorCaptionLabel(ControlP5Constants.RED).getValueLabel().getFont().setSize(30);
-        cp5.addSlider("COHESE")
-                .setPosition(SLIDER_LEFT, (vSpacing + SLIDER_HEIGHT) * ++count)
-                .setSize(SLIDER_WIDTH, SLIDER_HEIGHT)
-                .setRange(1, 100)
-                .setValue(COHESE)
-                .setColorCaptionLabel(ControlP5Constants.RED).getValueLabel().getFont().setSize(30);
-        cp5.addSlider("FOLLOW")
-                .setPosition(SLIDER_LEFT, (vSpacing + SLIDER_HEIGHT) * ++count)
-                .setSize(SLIDER_WIDTH, SLIDER_HEIGHT)
-                .setRange(1, 100)
-                .setValue(FOLLOW)
-                .setColorCaptionLabel(ControlP5Constants.RED).getValueLabel().getFont().setSize(30);
-        cp5.addSlider("AVOID_FORCE")
-                .setPosition(SLIDER_LEFT, (vSpacing + SLIDER_HEIGHT) * ++count)
-                .setSize(SLIDER_WIDTH, SLIDER_HEIGHT)
-                .setRange(1, 100)
-                .setValue(AVOID_FORCE)
-                .setColorCaptionLabel(ControlP5Constants.RED).getValueLabel().getFont().setSize(30);
-        cp5.addSlider("COHESE_FORCE")
-                .setPosition(SLIDER_LEFT, (vSpacing + SLIDER_HEIGHT) * ++count)
-                .setSize(SLIDER_WIDTH, SLIDER_HEIGHT)
-                .setRange(1, 100)
-                .setValue(COHESE_FORCE)
-                .setColorCaptionLabel(ControlP5Constants.RED).getValueLabel().getFont().setSize(30);
-        cp5.addSlider("FOLLOW_FORCE")
-                .setPosition(SLIDER_LEFT, (vSpacing + SLIDER_HEIGHT) * ++count)
-                .setSize(SLIDER_WIDTH, SLIDER_HEIGHT)
-                .setRange(1, 100)
-                .setValue(FOLLOW_FORCE)
-                .setColorCaptionLabel(ControlP5Constants.RED).getValueLabel().getFont().setSize(30);
-
-        cp5.addSlider("particle_size")
-                .setPosition(SLIDER_LEFT, (vSpacing + SLIDER_HEIGHT) * ++count)
-                .setSize(SLIDER_WIDTH, SLIDER_HEIGHT)
-                .setRange(1, 50)
-                .setValue(particle_size)
-                .setColorCaptionLabel(ControlP5.BLUE).getValueLabel().getFont().setSize(30);
+        setupControlPanel(this);
 
         // avoid means to find position of each particle around me, and steer away from each one in proportion
         // to how close I am to them.
@@ -247,15 +206,74 @@ public class FlockingExample extends PApplet {
         }
     }
 
+    private void setupControlPanel(PApplet app) {
+        cp5 = new ControlP5(this);
+        final int SLIDER_WIDTH = 200;
+        final int SLIDER_HEIGHT = 20;
+        final int SLIDER_LEFT = 40;
+        final int vSpacing = 15;
+        final int hSpacing = 40;
+        int count = 0;
+
+        cp5.getFont().setSize(24);
+
+        cp5.addSlider("AVOID")
+                .setPosition(SLIDER_LEFT, ((vSpacing + SLIDER_HEIGHT) * ++count) + flockFrameHeight)
+                .setSize(SLIDER_WIDTH, SLIDER_HEIGHT)
+                .setRange(1, 100)
+                .setValue(AVOID)
+                .setColorCaptionLabel(ControlP5Constants.RED);
+        cp5.addSlider("COHESE")
+                .setPosition(SLIDER_LEFT, ((vSpacing + SLIDER_HEIGHT) * ++count) + flockFrameHeight)
+                .setSize(SLIDER_WIDTH, SLIDER_HEIGHT)
+                .setRange(1, 100)
+                .setValue(COHESE);
+        cp5.addSlider("FOLLOW")
+                .setPosition(SLIDER_LEFT, ((vSpacing + SLIDER_HEIGHT) * ++count) + flockFrameHeight)
+                .setSize(SLIDER_WIDTH, SLIDER_HEIGHT)
+                .setRange(1, 100)
+                .setValue(FOLLOW);
+        cp5.addSlider("AVOID_FORCE")
+                .setPosition(SLIDER_LEFT, ((vSpacing + SLIDER_HEIGHT) * ++count) + flockFrameHeight)
+                .setSize(SLIDER_WIDTH, SLIDER_HEIGHT)
+                .setRange(1, 100)
+                .setValue(AVOID_FORCE);
+        cp5.addSlider("COHESE_FORCE")
+                .setPosition(SLIDER_LEFT, ((vSpacing + SLIDER_HEIGHT) * ++count) + flockFrameHeight)
+                .setSize(SLIDER_WIDTH, SLIDER_HEIGHT)
+                .setRange(1, 100)
+                .setValue(COHESE_FORCE);
+        cp5.addSlider("FOLLOW_FORCE")
+                .setPosition(SLIDER_LEFT, ((vSpacing + SLIDER_HEIGHT) * ++count) + flockFrameHeight)
+                .setSize(SLIDER_WIDTH, SLIDER_HEIGHT)
+                .setRange(1, 100)
+                .setValue(FOLLOW_FORCE);
+        cp5.addSlider("particle_size")
+                .setPosition(SLIDER_LEFT, ((vSpacing + SLIDER_HEIGHT) * ++count) + flockFrameHeight)
+                .setSize(SLIDER_WIDTH, SLIDER_HEIGHT)
+                .setRange(1, 50)
+                .setValue(particle_size);
+
+        count = 0;
+        cp5.addToggle("pauseFlock")
+                .setPosition(SLIDER_LEFT + SLIDER_WIDTH * 2 + hSpacing,
+                        ((vSpacing + SLIDER_HEIGHT) * ++count) + flockFrameHeight)
+                .setSize(100, SLIDER_HEIGHT)
+                .setValue(false);
+
+        count++;
+        cp5.addTextfield(featuredParticleId, "Featured Particle ID")
+                .setPosition(SLIDER_LEFT + SLIDER_WIDTH * 2 + hSpacing, ((vSpacing + SLIDER_HEIGHT) * ++count) + flockFrameHeight)
+                .setSize(SLIDER_WIDTH, SLIDER_HEIGHT);
+
+    }
+
 
     public void draw() {
 
-
-        //if ( stepFrame ) {
-        //    stepFrame = false;
         background(BACKGROUND);
 
-        // draw flocking frame
+        // draw frame around everything
         pushStyle();
         stroke(0);
         strokeWeight(4);
@@ -264,10 +282,39 @@ public class FlockingExample extends PApplet {
         line(flockFrameWidth,particleNeighborHeight,width,particleNeighborHeight);
         popStyle();
 
-        flock.updateUsingAll(this);
+
+        if ( !pauseFlock) {
+            if ( !pauseFlock) {
+                flock.updateUsingAll(this);
+            }
+        }
+
         flock.draw(this);
 
-        //}
+        // draw "feature" frame
+        int textY = 30;
+        int textX = flockFrameWidth + 30;
+        text(mouseX + ", " + mouseY, textX, textY);
+        textY += 20;
+        text("featured: " + featuredParticleId, textX, textY);
+
+        flock.getMembers().stream().filter((p) -> p.getId() == featuredParticleId).forEach(
+                p -> {
+                    pushStyle();
+                    pushMatrix();
+                    // draw it in the center of the featured frame
+                    translate(p.getPosition().x, p.getPosition().y);
+                    fill(0,255,0);
+                    ellipse(0,0,particle_size,particle_size);
+                    flock.getNeighborsWithinDistance(p.getPosition(), (width - flockFrameWidth) / 2)
+                            .stream()
+                            .forEach( neighbor -> neighbor.getDrawer().draw(this,neighbor));
+                    popMatrix();
+                    popStyle();
+                }
+        );
+
+
 
     }
 
@@ -276,8 +323,24 @@ public class FlockingExample extends PApplet {
         super.keyTyped(event);
 
         if ( event.getKey() == ' ') {
-            stepFrame = true;
+            pauseFlock = !pauseFlock;
         }
+    }
+
+    @Override
+    public void mouseMoved() {
+        super.mouseMoved();
+
+        flock.getMembers().stream()
+                .filter( p -> {
+                    return Math.abs(p.getPosition().x - mouseX) < 3 && Math.abs(p.getPosition().y - mouseY) < 3;
+                })
+                .forEach( (p) -> {
+                    featuredParticleId = p.getId();
+                    println("featured Particle = " + featuredParticleId);
+                });
+
+
     }
 
     static public void main(String[] passedArgs) {

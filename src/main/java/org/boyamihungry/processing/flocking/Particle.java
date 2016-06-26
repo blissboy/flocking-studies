@@ -70,6 +70,7 @@ public class Particle {
                     Wiggler wiggler,
                     ParticleBorderTeleporter teleporter) {
 
+        this.id = id;
         this.velocity = velocity;
         this.drawer = drawer;
         this.position = position;

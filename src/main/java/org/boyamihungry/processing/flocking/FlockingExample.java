@@ -2,15 +2,16 @@ package org.boyamihungry.processing.flocking;
 
 import controlP5.ControlP5;
 import controlP5.ControlP5Constants;
-import org.boyamihungry.processing.DrawingUtilities;
 import org.boyamihungry.processing.PVectorSummingCollector;
 import processing.core.PApplet;
 import processing.core.PVector;
 import processing.event.KeyEvent;
 
 import javax.validation.constraints.NotNull;
+import java.util.HashMap;
+import java.util.Map;
 
-import static org.boyamihungry.processing.DrawingUtilities.getOriginVector;
+import static org.boyamihungry.processing.DrawingUtilities.arrowLine;
 import static org.boyamihungry.processing.flocking.Particle.FOLLOW_DISTANCE;
 
 /**
@@ -19,14 +20,14 @@ import static org.boyamihungry.processing.flocking.Particle.FOLLOW_DISTANCE;
 public class FlockingExample extends PApplet {
 
     // variables tied to controls
-    private int AVOID = 5;
-    private float AVOID_FORCE = 20f;
+    private int AVOID = 3;
+    private float AVOID_FORCE = .05f;
 
     private int COHESE = 50;
     private float COHESE_FORCE = 2f;
 
     private int FOLLOW = 50;
-    private float FOLLOW_FORCE = .2f;
+    private float FOLLOW_FORCE = .32f;
 
     private int particle_size = 5;
 
@@ -51,16 +52,43 @@ public class FlockingExample extends PApplet {
 
     private int flockFrameWidth = 1280;
     private int flockFrameHeight = 800;
-    private int particleNeighborHeight = 540;
-
-
-
-
-
-
+    private int featureFrameHeight = 540;
+    private int featureFrameWidth = WIDTH - flockFrameWidth;
+    private int featureFrameXCenter = flockFrameWidth + (featureFrameWidth / 2);
+    private int featureFrameYCenter = featureFrameHeight / 2;
+    private PVector featureFrameCenter = new PVector(featureFrameXCenter, featureFrameYCenter);
     boolean stepFrame = false;
 
-    //List particles;
+    static final String FEATURED_WINDOW_DRAWER = "FEATURED_WINDOW_DRAWER";
+    private int currentFeaturedWindowRange = COHESE;
+
+
+    Map<Integer, PVector> featuredCoheseEffectsMap = new HashMap<>();
+
+
+    /**
+     * Take two points A and B, translate their position (such as to a new window), 
+     * to create two points C and D, then zoom in on the two points. Given the position of 
+     * points A, B, and C, and the ratio of the zoom window to the original window, calculate
+     * the location of point D. 
+     *
+     * @param ptA
+     * @param ptB
+     * @param ptC
+     * @param xZoomRatio
+     * @param yZoomRatio
+     * @return
+     */
+    private PVector zoomInOnTwoPoints(PVector ptA, PVector ptB, PVector ptC, float xZoomRatio, float yZoomRatio) {
+//        PVector dum =        new PVector(
+//
+        return new PVector(
+                ptC.x + ((ptB.x - ptA.x) * (xZoomRatio)),
+                ptC.y + ((ptB.y - ptA.y) * (yZoomRatio))
+//                -1 * (((ptA.x - ptB.x) * xZoomRatio) - ptC.x),
+//                -1 * (((ptA.y - ptB.y) * yZoomRatio) - ptC.y)
+        );
+    }
 
     public void settings() {
         size(WIDTH,HEIGHT);
@@ -72,44 +100,6 @@ public class FlockingExample extends PApplet {
 
         this.frameRate(90f);
         setupControlPanel(this);
-
-        // avoid means to find position of each particle around me, and steer away from each one in proportion
-        // to how close I am to them.
-        Particle.ParticleAvoidCalculator avoid = (app, affectingP, affectedP) -> {
-            // get distance between
-            float dist = affectingP.getPosition().dist(affectedP.getPosition());
-            if ( dist < AVOID ) {
-                return PVector.sub(affectedP.getPosition(), affectingP.getPosition())
-                        .normalize()
-                        .div(dist)
-                        .mult(AVOID_FORCE);
-            } else {
-                return getOriginVector();
-            }
-        };
-
-        // follow means to look at velocity of particles near me, then follow that vel.
-        Particle.ParticleFollowCalculator follow = (app, affectingP, affectedP) -> {
-            return affectingP.getVelocity().copy().sub(affectedP.getVelocity());
-        };
-
-
-        // cohese means to look at locations of particles around me and steer towards them.
-        Particle.ParticleCoheseCalculator cohese = (app, affectingP, affectedP) -> {
-            return affectingP.getPosition().copy().sub(affectedP.getPosition());
-        };
-
-        Particle.ParticleBorderVelocityReaction borderVel =
-                (app, p) -> {
-                    // left border
-                    float otherWayVelX = ( p.getVelocity().x + BORDER_FORCE ) / (p.getPosition().x * p.getPosition().x);
-                    otherWayVelX += ( p.getVelocity().x - BORDER_FORCE ) / (Math.pow(((float)width) - p.getPosition().x,2));
-
-                    float otherWayVelY = ( p.getVelocity().y + BORDER_FORCE ) / (p.getPosition().y * p.getPosition().y);
-                    otherWayVelY += ( p.getVelocity().y - BORDER_FORCE ) / (Math.pow((((float)height) - p.getPosition().y),2));
-
-                    return new PVector(otherWayVelX, otherWayVelY).mult(BORDER_FORCE);
-                };
 
         SimpleFlock flock = new SimpleFlock();
 
@@ -126,7 +116,7 @@ public class FlockingExample extends PApplet {
                                 text(p.getId(),0,0);
                                 ellipse(0,0,particle_size,particle_size);
                                 stroke(0,128,0);
-                                DrawingUtilities.arrowLine(app,0,0,p.getVelocity().x * 10, p.getVelocity().y * 10, 0, .333f, true);
+                                arrowLine(app,0,0,p.getVelocity().x * 10, p.getVelocity().y * 10, 0, .333f, true);
                                 popStyle();
                                 popMatrix();
                             })
@@ -134,20 +124,25 @@ public class FlockingExample extends PApplet {
                                 PVector theSum = flock.getNeighborsWithinDistance(p.getPosition(), AVOID)
                                         .stream()
                                         .filter(neighborP -> (neighborP.getId() != p.getId()))
-                                        .map( member -> PVector.sub(p.getPosition(), member.getPosition()).div(p.getPosition().dist(member.getPosition().mult(AVOID_FORCE))))
+                                        .map( member ->
+                                                PVector.sub(p.getPosition(), member.getPosition())
+                                                .div(p.getPosition().dist(member.getPosition().copy().mult(AVOID_FORCE))))
                                         .collect(new PVectorSummingCollector());
 
                                 return theSum;
 
                             })
                             .withCoheseToFlockCalculator((p,f) -> {
-                                PVector theSum = flock.getNeighborsWithinDistance(p.getPosition(), FOLLOW_DISTANCE)
+                                return flock.getNeighborsWithinDistance(p.getPosition(), FOLLOW_DISTANCE)
                                         .stream()
                                         .filter(closeP -> (closeP.getId() != p.getId()))
-                                        .map( member -> member.getPosition().copy().sub(p.getPosition() ))
+                                        .map( neighbor -> {
+                                            if ( neighbor.getId() == featuredParticleId ) {
+                                                featuredCoheseEffectsMap.put(p.getId(),neighbor.getPosition().copy().sub(p.getPosition()));
+                                            }
+                                            return neighbor.getPosition().copy().sub(p.getPosition() );
+                                        })
                                         .collect(new PVectorSummingCollector());
-
-                                return theSum;
                             })
                             .withFollowFlockCalculator(
                                     ( p, f) -> { // follow flock
@@ -193,7 +188,6 @@ public class FlockingExample extends PApplet {
                                     }
                             )
                             .build()
-
             );
         }
 
@@ -266,6 +260,10 @@ public class FlockingExample extends PApplet {
                 .setPosition(SLIDER_LEFT + SLIDER_WIDTH * 2 + hSpacing, ((vSpacing + SLIDER_HEIGHT) * ++count) + flockFrameHeight)
                 .setSize(SLIDER_WIDTH, SLIDER_HEIGHT);
 
+
+
+
+
     }
 
 
@@ -279,14 +277,13 @@ public class FlockingExample extends PApplet {
         strokeWeight(4);
         line(flockFrameWidth,0,flockFrameWidth,height);
         line(0,flockFrameHeight,flockFrameWidth,flockFrameHeight);
-        line(flockFrameWidth,particleNeighborHeight,width,particleNeighborHeight);
+        line(flockFrameWidth, featureFrameHeight,width, featureFrameHeight);
         popStyle();
 
 
-        if ( !pauseFlock) {
-            if ( !pauseFlock) {
-                flock.updateUsingAll(this);
-            }
+        if ( !pauseFlock || stepFrame ) {
+            flock.updateUsingAll(this);
+            stepFrame = false;
         }
 
         flock.draw(this);
@@ -297,33 +294,81 @@ public class FlockingExample extends PApplet {
         text(mouseX + ", " + mouseY, textX, textY);
         textY += 20;
         text("featured: " + featuredParticleId, textX, textY);
+        textY += 20;
 
-        flock.getMembers().stream().filter((p) -> p.getId() == featuredParticleId).forEach(
-                p -> {
-                    pushStyle();
-                    pushMatrix();
-                    // draw it in the center of the featured frame
-                    translate(p.getPosition().x, p.getPosition().y);
-                    fill(0,255,0);
-                    ellipse(0,0,particle_size,particle_size);
-                    flock.getNeighborsWithinDistance(p.getPosition(), (width - flockFrameWidth) / 2)
-                            .stream()
-                            .forEach( neighbor -> neighbor.getDrawer().draw(this,neighbor));
-                    popMatrix();
-                    popStyle();
-                }
-        );
+        if ( flock.getMembers().containsKey(featuredParticleId)) {
+            Particle featuredParticle = flock.getMembers().get(featuredParticleId);
 
+            // todo: figure out scaling based on what we are displaying (cohese, follow, avoid). For now, just using cohese
+            int currentFeaturedWindowRange = COHESE;
+            float xZoomRatio = (float)featureFrameWidth / (float)currentFeaturedWindowRange;
+            float yZoomRatio = (float)featureFrameHeight / (float)currentFeaturedWindowRange;
 
+            pushStyle();
+            // draw featured in feature frame
+            fill(255, 255, 255);
+            ellipse(featureFrameXCenter,featureFrameYCenter, particle_size * 3, particle_size * 3);
+            stroke(0,255,0);
+            fill(0,255,0);
+            pushMatrix();
+            translate(featureFrameXCenter, featureFrameYCenter);
+            arrowLine(this,
+                    0,
+                    0,
+                    featuredParticle.getVelocity().x * 10 * xZoomRatio,
+                    featuredParticle.getVelocity().y * 10 * yZoomRatio,
+                    0,
+                    0.333f,
+                    true);
 
+            // draw circle of interest
+            stroke(255,0,255);
+            noFill();
+            ellipse(featureFrameXCenter, featureFrameYCenter, currentFeaturedWindowRange, currentFeaturedWindowRange);
+            popMatrix();
+
+            // draw the featured particle's neighbors, and show their impact on the featured
+            flock.getNeighborsWithinDistance(featuredParticle.getPosition(), currentFeaturedWindowRange)
+                    .stream()
+                    .filter(neighbor -> neighbor.getId() != featuredParticle.getId())
+                    .forEach(neighbor -> {
+                        PVector translatedNeighbor = zoomInOnTwoPoints(
+                                featuredParticle.getPosition(),
+                                neighbor.getPosition(),
+                                featureFrameCenter,
+                                xZoomRatio,
+                                yZoomRatio);
+                        //System.out.println( "translated neighbor id:" + neighbor.getId() + " " + translatedNeighbor.x + "," + translatedNeighbor.y);
+                        pushMatrix();
+                        translate(translatedNeighbor.x, translatedNeighbor.y);
+                        ellipse(0,0, particle_size, particle_size);
+                        arrowLine(this,0,0,neighbor.getVelocity().x * 10 * xZoomRatio, neighbor.getVelocity().y * 10 * yZoomRatio, 0, 0.333f, true);
+                        text(neighbor.getId(), 0,0);
+                        stroke (255,0,0);
+                        if ( featuredCoheseEffectsMap.containsKey(neighbor.getId())) {
+                            arrowLine(this, 0,0, featuredCoheseEffectsMap.get(neighbor.getId()).x * 10, featuredCoheseEffectsMap.get(neighbor.getId()).y * 10, 0, 0.333f, true);
+                        }
+                        popMatrix();
+                    });
+            popStyle();
+        }
     }
+
 
     @Override
     public void keyTyped(KeyEvent event) {
         super.keyTyped(event);
 
-        if ( event.getKey() == ' ') {
-            pauseFlock = !pauseFlock;
+        switch ( event.getKey()) {
+            case 'p' :
+                pauseFlock = !pauseFlock;
+                break;
+            case ' ' :
+                pauseFlock = true;
+                stepFrame = true;
+                break;
+            default:
+                // no op
         }
     }
 
@@ -331,16 +376,33 @@ public class FlockingExample extends PApplet {
     public void mouseMoved() {
         super.mouseMoved();
 
-        flock.getMembers().stream()
+        flock.getMembers().values().stream()
                 .filter( p -> {
                     return Math.abs(p.getPosition().x - mouseX) < 3 && Math.abs(p.getPosition().y - mouseY) < 3;
                 })
                 .forEach( (p) -> {
-                    featuredParticleId = p.getId();
-                    println("featured Particle = " + featuredParticleId);
+                    if ( p.getId() != featuredParticleId) {
+                        int oldFeaturedId = featuredParticleId;
+                        featuredParticleId = p.getId();
+                        println("featured Particle = " + featuredParticleId);
+                        flock.getMembers().get(featuredParticleId).addDrawer(FEATURED_WINDOW_DRAWER,
+                                oldFeaturedId < 0 ?
+                                        (app,featured) -> {   // drawing function
+                                            pushMatrix();
+                                            pushStyle();
+                                            translate(featured.getPosition().x, featured.getPosition().y);
+                                            noFill();
+                                            stroke(255,255,0);
+                                            ellipse(0,0,currentFeaturedWindowRange,currentFeaturedWindowRange);
+                                            popStyle();
+                                            popMatrix();
+                                        } :
+                                        flock.getMembers().get(oldFeaturedId).removeDrawer(FEATURED_WINDOW_DRAWER)
+
+                        );
+                    }
+
                 });
-
-
     }
 
     static public void main(String[] passedArgs) {

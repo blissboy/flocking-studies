@@ -3,6 +3,7 @@ package org.boyamihungry.processing.flocking;
 import processing.core.PApplet;
 import processing.core.PVector;
 
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 
@@ -12,35 +13,43 @@ import java.util.Set;
 public interface Flock {
 
     public void addMember(Particle p);
-    public Set<Particle> getMembers();
+    public Map<Integer, Particle> getMembers();
     public Set<Particle> getNeighborsWithinDistance(PVector location, int distance);
 
     default void updateUsingAll(PApplet app){
-            followAll(app);
-            avoidAll(app);
-            coheseAll(app);
-            stepAll(app);
-            bordersAll(app);
-        };
+        followAll(app);
+        avoidAll(app);
+        coheseAll(app);
+        stepAll(app);
+        bordersAll(app);
+    };
     default public void coheseAll(PApplet app){
-            for(Particle p:getMembers()){
-                p.getCoheseToFlockCalculator().coheseToFlock(p,this);
-            }
-        };
+        getMembers().values().stream().forEach(
+                (p) -> {
+                    p.getCoheseToFlockCalculator().coheseToFlock(p,this);
+                }
+        );
+    };
     default public void followAll(PApplet app){
-        for(Particle p:getMembers()){
-            p.getFollowFlockCalculator().followFlock(p,this);
-        }
+        getMembers().values().stream().forEach(
+                (p) -> {
+                    p.getFollowFlockCalculator().followFlock(p,this);
+                }
+        );
     };
     default public void avoidAll(PApplet app){
-            for(Particle p:getMembers()){
-                p.getAvoidWithinFlockCalculator().avoidFlock(p,this);
-            }
-        };
+        getMembers().values().stream().forEach(
+                (p) -> {
+                    p.getAvoidWithinFlockCalculator().avoidFlock(p,this);
+                }
+        );
+    };
     default public void stepAll(PApplet app) {
-        for(Particle p:getMembers()){
-            p.step(Optional.of(this));
-        }
+        getMembers().values().stream().forEach(
+                (p) -> {
+                    p.step(Optional.of(this));
+                }
+        );
     }
     default public void bordersAll(PApplet app) {
 //        for(Particle p:getMembers()){
@@ -48,9 +57,11 @@ public interface Flock {
 //        }
     }
     default public void draw(PApplet app) {
-        for (Particle p : getMembers()) {
-            p.getDrawer().draw(app,p);
-        }
+        getMembers().values().stream().forEach(
+                (particle) -> {
+                    particle.getDrawers().values().parallelStream().forEach((drawer) -> drawer.draw(app,particle));
+                }
+        );
     }
 
 }

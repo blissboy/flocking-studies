@@ -3,7 +3,8 @@ package org.boyamihungry.processing.flocking;
 import processing.core.PVector;
 
 import javax.validation.constraints.NotNull;
-import java.util.HashSet;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -13,16 +14,16 @@ import java.util.stream.Collectors;
 public class SimpleFlock implements Flock {
 
 
-    Set<Particle> particles = new HashSet<>();
+    Map<Integer,Particle> particles = new HashMap<>();
 
 
     @Override
     public void addMember(@NotNull Particle p) {
-        particles.add(p);
+        particles.put(p.getId(),p);
     }
 
     @Override
-    public Set<Particle> getMembers() {
+    public Map<Integer, Particle> getMembers() {
         return particles;
     }
 
@@ -30,7 +31,7 @@ public class SimpleFlock implements Flock {
     public Set<Particle> getNeighborsWithinDistance(@NotNull PVector location,
                                                     @NotNull int distance) {
 
-        return getMembers().stream()
+        return getMembers().values().stream()
                         .filter(p -> location.dist(p.getPosition()) < distance)
                         .collect(Collectors.toSet());
     }

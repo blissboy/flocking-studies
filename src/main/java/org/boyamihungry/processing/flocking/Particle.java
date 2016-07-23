@@ -5,8 +5,11 @@ import processing.core.PApplet;
 import processing.core.PVector;
 
 import javax.validation.constraints.NotNull;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.function.Function;
 
 
 /**
@@ -31,7 +34,7 @@ public class Particle {
     @NotNull
     private PVector velocity;
     @NotNull
-    private ParticleDraw drawer;
+    private Map<String,ParticleDraw> drawers;
 
     @NotNull
     private ParticleFollowFlockCalculator followFlockCalculator;
@@ -48,17 +51,10 @@ public class Particle {
     @NotNull
     private ParticleBorderTeleporter teleporter;
 
-
-
-    //todo: how to use this?
     @NotNull
-    private ParticleBorderVelocityReaction borderVelReaction =
-            (app, p) -> {return DrawingUtilities.getOriginVector();};
+    private Function<Particle, Particle> coheseMapper;
 
-    @NotNull
-    private ParticleBorderAccelReaction borderAccReaction =
-            (app, p) -> {return DrawingUtilities.getOriginVector();};
-
+    private static String BASE_DRAWER = "base_drawer";
 
     public Particle(int id,
                     PVector position,
@@ -72,7 +68,8 @@ public class Particle {
 
         this.id = id;
         this.velocity = velocity;
-        this.drawer = drawer;
+        this.drawers = new HashMap<>();
+        this.drawers.put(BASE_DRAWER,drawer);
         this.position = position;
         this.coheseFlockCalculator = coheseFlock;
         this.followFlockCalculator = followFlock;
@@ -113,7 +110,7 @@ public class Particle {
     }
     @FunctionalInterface
     public interface ParticleFollowCalculator {
-        public PVector follow(PApplet app,
+        public PVector follow(//PApplet app,
                               Particle affectedP,
                               Particle affectingP);
     }
@@ -125,7 +122,7 @@ public class Particle {
     }
     @FunctionalInterface
     public interface ParticleAvoidCalculator {
-        public PVector avoid(PApplet app,
+        public PVector avoid(//PApplet app,
                              Particle affectedP,
                              Particle affectingP);
     }
@@ -139,7 +136,6 @@ public class Particle {
     }
 
 
-
     @FunctionalInterface
     public interface ParticleAvoidFlockCalculator {
         public PVector avoidFlock(//PApplet app,
@@ -148,32 +144,11 @@ public class Particle {
     }
 
 
-
-
-
-    @FunctionalInterface
-    public interface ParticleCoheseCalculator {
-        public PVector cohese(PApplet app,
-                              Particle affectedP,
-                              Particle affectingP);
-    }
     @FunctionalInterface
     public interface ParticleCoheseFlockCalculator {
         public PVector coheseToFlock(//PApplet app,
                                      Particle affectedP,
                                      Flock flock);
-    }
-
-    @FunctionalInterface
-    public interface ParticleBorderVelocityReaction {
-        public PVector borderReact(PApplet app,
-                                   Particle affectedP);
-    }
-
-    @FunctionalInterface
-    public interface ParticleBorderAccelReaction {
-        public PVector borderReact(PApplet app,
-                                   Particle affectedP);
     }
 
     @FunctionalInterface
@@ -188,12 +163,12 @@ public class Particle {
 
     @FunctionalInterface
     public interface ParticleBorderTeleporter {
-        public PVector teleportIfNeeded(Particle p);
+        PVector teleportIfNeeded(Particle p);
     }
 
 
-    public ParticleDraw getDrawer() {
-        return drawer;
+    public Map<String, ParticleDraw> getDrawers() {
+        return drawers;
     }
 
     public int getId() {
@@ -224,9 +199,16 @@ public class Particle {
         return avoidFlockCalculator;
     }
 
+    public Particle.ParticleDraw addDrawer(String key, Particle.ParticleDraw drawer) {
+        return this.drawers.put(key, drawer);
+    }
+
+    public Particle.ParticleDraw removeDrawer(String key) {
+        return this.drawers.remove(key);
+    }
 
 
-//    public void borders(PApplet app) {
+    //    public void borders(PApplet app) {
 ////        float mag = acceleration.mag();
 ////        acceleration.add(this.borderAccReaction.borderReact(app, this));
 ////        acceleration.setMag(mag);

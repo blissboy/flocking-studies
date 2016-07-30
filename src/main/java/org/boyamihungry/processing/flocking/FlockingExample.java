@@ -126,7 +126,7 @@ public class FlockingExample extends PApplet {
                                         .filter(neighborP -> (neighborP.getId() != p.getId()))
                                         .map( member ->
                                                 PVector.sub(p.getPosition(), member.getPosition())
-                                                .div(p.getPosition().dist(member.getPosition().copy().mult(AVOID_FORCE))))
+                                                        .div(p.getPosition().dist(member.getPosition().copy().mult(AVOID_FORCE))))
                                         .collect(new PVectorSummingCollector());
 
                                 return theSum;
@@ -281,10 +281,6 @@ public class FlockingExample extends PApplet {
         popStyle();
 
 
-        if ( !pauseFlock || stepFrame ) {
-            flock.updateUsingAll(this);
-            stepFrame = false;
-        }
 
         flock.draw(this);
 
@@ -300,9 +296,11 @@ public class FlockingExample extends PApplet {
             Particle featuredParticle = flock.getMembers().get(featuredParticleId);
 
             // todo: figure out scaling based on what we are displaying (cohese, follow, avoid). For now, just using cohese
+            int currentZoomRegion = COHESE * 2;
             int currentFeaturedWindowRange = COHESE;
-            float xZoomRatio = (float)featureFrameWidth / (float)currentFeaturedWindowRange;
-            float yZoomRatio = (float)featureFrameHeight / (float)currentFeaturedWindowRange;
+
+            float xZoomRatio = (float)featureFrameWidth / (float)currentZoomRegion;
+            float yZoomRatio = (float)featureFrameHeight / (float)currentZoomRegion;
 
             pushStyle();
             // draw featured in feature frame
@@ -324,7 +322,7 @@ public class FlockingExample extends PApplet {
             // draw circle of interest
             stroke(255,0,255);
             noFill();
-            ellipse(featureFrameXCenter, featureFrameYCenter, currentFeaturedWindowRange, currentFeaturedWindowRange);
+            ellipse(0, 0, currentZoomRegion * xZoomRatio, currentZoomRegion * yZoomRatio);
             popMatrix();
 
             // draw the featured particle's neighbors, and show their impact on the featured
@@ -352,6 +350,12 @@ public class FlockingExample extends PApplet {
                     });
             popStyle();
         }
+
+        if ( !pauseFlock || stepFrame ) {
+            flock.updateUsingAll(this);
+            stepFrame = false;
+        }
+
     }
 
 
